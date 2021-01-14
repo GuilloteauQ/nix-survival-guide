@@ -1,0 +1,89 @@
+#+TITLE: Simple Local Nix Package Import
+#+AUTHOR: Quentin
+#+DATE: <2021-01-14 Thu>
+
+* Introduction
+
+We are in the following situation:
+
+- we have written a Nix Package
+- we want to add it to a shell or to another package
+- what should we do ?
+
+
+* Simple Nix Package
+
+Let us first write a simple package.
+
+#+NAME: salut_source_code
+#+BEGIN_EXAMPLE C
+#include <stdio.h>
+
+int main() {
+    printf("salut !\n");
+    return 0;
+}
+#+END_EXAMPLE
+
+And the Nix derivation:
+
+#+NAME: salut_derivation
+#+BEGIN_EXAMPLE nix
+with import <nixpkgs> {};
+
+stdenv.mkDerivation {
+  name = "salut";
+  src = ./.;
+  buildInputs = [
+    gcc
+  ];
+  buildPhase = ''
+    gcc salut.c -o salut
+  '';
+  installPhase = ''
+    mkdir -p $out/bin
+    mv salut $out/bin
+  '';
+}
+#+END_EXAMPLE
+
+#+BEGIN_SRC sh :var der_content=salut_derivation :var code_content=salut_source_code :exports none
+echo "$der_content" > salut.nix
+echo "$code_content" > salut.c
+#+END_SRC
+
+#+BEGIN_SRC sh :exports both
+nix-build salut.nix
+#+END_SRC
+
+#+RESULTS:
+: /nix/store/6p86r92qpacck6bng24afpdjiw9wqhpi-salut
+
+
+* Import salut to a Shell
+  
+
+#+NAME: shell
+#+BEGIN_EXAMPLE
+let
+  pkgs = import <nixpkgs> {};
+  salut = import ./salut.nix;
+in with pkgs;
+mkShell {
+  name = "salut_shell";
+  buildInputs = [
+    salut
+  ];
+}
+#+END_EXAMPLE
+
+#+BEGIN_SRC sh :var content_shell=shell :exports none
+echo "$content_shell" > shell_salut.nix
+#+END_SRC
+
+#+BEGIN_SRC sh :exports both
+nix-shell shell_salut.nix --run "salut"
+#+END_SRC
+
+#+RESULTS:
+: salut !
