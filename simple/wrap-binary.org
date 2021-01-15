@@ -1,0 +1,105 @@
+#+TITLE: Wrap Binaries
+#+AUTHOR: Quentin
+#+DATE: <2021-01-15 Fri>
+
+We will write a simple MPI application and wrap openmpi with it.
+
+* Simple MPI Application
+
+We write a very small MPI program that prints a sentence for every
+machine involved.
+
+#+BEGIN_EXAMPLE c
+#include <mpi.h>
+#include <stdio.h>
+
+int main(int argc, char** argv) {
+    MPI_Init(&argc, &argv);
+    int rank;
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    printf("Hello from node %d !\n", rank);
+    MPI_Finalize();
+    return 0;
+}
+#+END_EXAMPLE
+
+* Derivation
+  
+** First step: no wrapping
+
+#+BEGIN_EXAMPLE
+let
+  pkgs = import <nixpkgs> {};
+  inherit (pkgs) stdenv;
+  basic_hello = stdenv.mkDerivation {
+    name = "hello_mpi";
+    src = ./.;
+    buildInputs = with pkgs; [
+      gcc
+      openmpi
+    ];
+    buildPhase = ''
+      mpicc main.c -o hello_mpi
+    '';
+    installPhase = ''
+      mkdir -p $out/bin
+      cp hello_mpi $out/bin
+    '';
+  };
+in
+  basic_hello
+#+END_EXAMPLE
+
+But in order to call the hello_mpi binary, we must have openmpi on our
+system, and this is not what we want !
+
+** Second step: the wrapping
+
+We keep the same base as the previous derivation:
+
+#+BEGIN_EXAMPLE
+let
+  pkgs = import <nixpkgs> {};
+  inherit (pkgs) stdenv;
+  basic_hello = stdenv.mkDerivation {
+    name = "hello_mpi";
+    src = ./.;
+    buildInputs = with pkgs; [
+      gcc
+      openmpi
+    ];
+    buildPhase = ''
+      mpicc main.c -o hello_mpi
+    '';
+    installPhase = ''
+      mkdir -p $out/bin
+      cp hello_mpi $out/bin
+    '';
+  };
+
+  mpi_hello = pkgs.writeScriptBin "hello" ''
+#!${pkgs.stdenv.shell}
+# ${pkgs.openmpi}/bin/mpirun -np ${nb_nodes} $@ ${basic_hello}/bin/hello_mpi
+${pkgs.openmpi}/bin/mpirun  $@ ${basic_hello}/bin/hello_mpi
+  '';
+in
+
+pkgs.symlinkJoin {
+  name = "MPIHello";
+  paths = [
+    mpi_hello
+    basic_hello
+    pkgs.openmpi
+  ];
+}
+#+END_EXAMPLE
+
+Note that we wrote a script (writeScriptBin) which is a shell script
+wrapping the MPI application we defined (basic_hello).
+
+The issue is that we need to link the openmpi tools (e.g. mpirun) to
+this new shell script in order to execute the MPI program.
+
+This is where the symlinkJoin part comes into play.
+It will add the necessary symbolic links in the store in order to
+have mpirun available, and thus execute the program.
