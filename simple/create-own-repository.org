@@ -1,0 +1,240 @@
+#+TITLE: Create your own Nix Repository
+#+AUTHOR: Quentin
+#+DATE: <2021-01-15 Fri>
+
+* A couple of simple packages
+
+** The Hello package
+
+#+NAME: hello_source_code
+#+BEGIN_EXAMPLE C
+#include <stdio.h>
+
+int main() {
+    printf("hello !\n");
+    return 0;
+}
+#+END_EXAMPLE
+
+#+NAME: hello_derivation
+#+BEGIN_EXAMPLE nix
+with import <nixpkgs> {};
+
+stdenv.mkDerivation {
+  name = "hello";
+  src = ./.;
+  buildInputs = [
+    gcc
+  ];
+  buildPhase = ''
+    gcc hello.c -o hello
+  '';
+  installPhase = ''
+    mkdir -p $out/bin
+    mv hello $out/bin
+  '';
+}
+#+END_EXAMPLE
+
+#+BEGIN_SRC sh :var der_content=hello_derivation :var code_content=hello_source_code :exports none
+echo "$der_content" > hello.nix
+echo "$code_content" > hello.c
+#+END_SRC
+
+#+RESULTS:
+
+#+BEGIN_SRC sh :exports both
+nix-build hello.nix
+#+END_SRC
+
+#+RESULTS:
+: /nix/store/62b23hm0gchvis4dywv06vhbmiywisi7-hello
+
+** The Salut package
+
+#+NAME: salut_source_code
+#+BEGIN_EXAMPLE C
+#include <stdio.h>
+
+int main() {
+    printf("salut !\n");
+    return 0;
+}
+#+END_EXAMPLE
+
+#+NAME: salut_derivation
+#+BEGIN_EXAMPLE nix
+with import <nixpkgs> {};
+
+stdenv.mkDerivation {
+  name = "salut";
+  src = ./.;
+  buildInputs = [
+    gcc
+  ];
+  buildPhase = ''
+    gcc salut.c -o salut
+  '';
+  installPhase = ''
+    mkdir -p $out/bin
+    mv salut $out/bin
+  '';
+}
+#+END_EXAMPLE
+
+#+BEGIN_SRC sh :var der_content=salut_derivation :var code_content=salut_source_code :exports none
+echo "$der_content" > salut.nix
+echo "$code_content" > salut.c
+#+END_SRC
+
+#+RESULTS:
+
+#+BEGIN_SRC sh :exports both
+nix-build salut.nix
+#+END_SRC
+
+#+RESULTS:
+: /nix/store/n5wkv0mgqha6hnfb72brm2dvmhfiz7z7-salut
+
+* Our own Nix Repository
+ 
+** First Try
+
+#+NAME: my_pkgs
+#+BEGIN_EXAMPLE nix
+{
+   hello = import ./hello.nix;
+   salut = import ./salut.nix;
+}
+#+END_EXAMPLE
+
+#+BEGIN_SRC sh :var content_my_pkgs=my_pkgs :exports none
+echo "$content_my_pkgs" > my_pkgs.nix
+#+END_SRC
+
+#+RESULTS:
+
+#+NAME: shell
+#+BEGIN_EXAMPLE nix
+let
+    pkgs = import ./my_pkgs.nix;
+in with pkgs;
+mkShell {
+    name = "shell_hello_salut";
+    buildInputs = [
+        hello
+	salut
+    ];
+}
+#+END_EXAMPLE
+
+#+BEGIN_SRC sh :var content_shell=shell :exports none
+echo "$content_shell" > shell_hello_salut.nix
+#+END_SRC
+
+#+RESULTS:
+
+#+BEGIN_SRC sh :exports both
+nix-shell shell_hello_salut.nix --run "hello; salut" |& tee output.log
+#+END_SRC
+
+#+RESULTS:
+: error: undefined variable 'mkShell' at /home/quentin/these/nix-survival-guide/simple/shell_hello_salut.nix:4:1
+
+
+As you can see we have to import also nixpkgs to use mkShell.
+
+** Solution 1: Also import Nixpkgs in the shell
+
+#+NAME: shell_1
+#+BEGIN_EXAMPLE nix
+let
+    pkgs = import ./my_pkgs.nix;
+    nixpkgs = import <nixpkgs> {};
+in
+nixpkgs.mkShell {
+    name = "shell_hello_salut";
+    buildInputs = with pkgs; [
+        hello
+	salut
+    ];
+}
+#+END_EXAMPLE
+
+#+BEGIN_SRC sh :var content_shell=shell_1 :exports none
+echo "$content_shell" > shell_hello_salut.nix
+#+END_SRC
+
+#+RESULTS:
+
+#+BEGIN_SRC sh :results verbatim :exports both
+nix-shell shell_hello_salut.nix --run "hello; salut"
+#+END_SRC
+
+#+RESULTS:
+: hello !
+: salut !
+
+** Solution 2: Add mkShell in my_pkgs
+
+
+#+BEGIN_EXAMPLE nix
+let
+   nixpkgs = import <nixpkgs> {};
+in
+{
+   hello = import ./hello.nix;
+   salut = import ./salut.nix;
+   mkShell = nixpkgs.mkShell;
+   mkDerivation = nixpkgs.mkDerivation;
+}
+#+END_EXAMPLE
+
+But those "X = nixpkgs.X" are pretty ugly, and Nix offers a nice way
+to deal with it: *inherit*
+
+#+NAME: my_pkgs_inherit
+#+BEGIN_EXAMPLE nix
+let
+   nixpkgs = import <nixpkgs> {};
+in with nixpkgs;
+{
+   hello = import ./hello.nix;
+   salut = import ./salut.nix;
+   inherit mkShell mkDerivation;
+}
+#+END_EXAMPLE
+
+#+BEGIN_SRC sh :var content_my_pkgs=my_pkgs_inherit :exports none
+echo "$content_my_pkgs" > my_pkgs.nix
+#+END_SRC
+
+#+RESULTS:
+
+#+NAME: shell_2
+#+BEGIN_EXAMPLE nix
+let
+    pkgs = import ./my_pkgs.nix;
+in with pkgs;
+mkShell {
+    name = "shell_hello_salut";
+    buildInputs = [
+        hello
+	salut
+    ];
+}
+#+END_EXAMPLE
+
+#+BEGIN_SRC sh :var content_shell=shell_2 :exports none
+echo "$content_shell" > shell_hello_salut.nix
+#+END_SRC
+
+#+RESULTS:
+
+#+BEGIN_SRC sh :results verbatim :exports both
+nix-shell shell_hello_salut.nix --run "hello; salut"
+#+END_SRC
+
+#+RESULTS:
+: hello !
+: salut !
