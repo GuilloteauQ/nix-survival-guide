@@ -2,7 +2,7 @@
 
 let 
 
-inherit (import ./common/ssh-keys.nix pkgs) snakeOilPrivateKey snakeOilPublicKey;
+inherit (import ../common/ssh-keys.nix pkgs) snakeOilPrivateKey snakeOilPublicKey;
 
 in
 {
@@ -23,7 +23,7 @@ in
     # oar db passwords
     database = {
       host = "server";
-      passwordFile = if isArion then "/srv/common/oar-dbpassword" else "${./common/oar-dbpassword}";
+      passwordFile = if isArion then "/srv/common/oar-dbpassword" else "${../common/oar-dbpassword}";
     };
     server.host = "server";
     privateKeyFile = "/etc/privkey.snakeoil";

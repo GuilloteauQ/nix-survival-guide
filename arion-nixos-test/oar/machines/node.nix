@@ -6,7 +6,7 @@ in
   if isArion then
   lib.recursiveUpdate common {
     service.hostname="node";
-    nixos.configuration = (import ./services_node.nix { inherit pkgs lib isArion; });
+    nixos.configuration = (import ../services/services_node.nix { inherit pkgs lib isArion; });
   }
-else (import ./services_node.nix { inherit pkgs lib isArion; })
+else (import ../services/services_node.nix { inherit pkgs lib isArion; })
 

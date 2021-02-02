@@ -5,13 +5,13 @@
   skipLint = true;
 
   nodes.server = { ... }:
-  (import ./server.nix { inherit pkgs lib; isArion = false; });
+  (import ./machines/server.nix { inherit pkgs lib; isArion = false; });
 
   nodes.node = { ... }:
-  (import ./node.nix { inherit pkgs lib; isArion = false; });
+  (import ./machines/node.nix { inherit pkgs lib; isArion = false; });
 
   nodes.frontend = { ... }:
-  (import ./frontend.nix { inherit pkgs lib; isArion = false; });
+  (import ./machines/frontend.nix { inherit pkgs lib; isArion = false; });
 
   testScript = ''
 start_all()
