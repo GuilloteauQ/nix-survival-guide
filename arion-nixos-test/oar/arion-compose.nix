@@ -1,4 +1,4 @@
-{ pkgs, lib,... }:
+{ pkgs ? import ./arion-pkgs.nix , lib,... }:
 
 {
   config.services = {
