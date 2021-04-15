@@ -12,10 +12,8 @@ let
 
   nodes = (import ./test.nix { inherit pkgs lib; }).nodes;
 
-in {
-  config.services = builtins.mapAttrs (node_name: set:
-    lib.recursiveUpdate {
-      nixos.configuration = set;
-      service.hostname = node_name;
-    } common_arion) nodes;
-}
+  # import of the function generating Arion expression
+  to_arion = import ./to_arion.nix;
+
+in 
+  to_arion {inherit lib common_arion nodes;}
