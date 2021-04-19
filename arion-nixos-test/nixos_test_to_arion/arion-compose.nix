@@ -1,7 +1,7 @@
 { pkgs ? import ./arion-pkgs.nix, lib, ... }:
 
 let
-  common_arion = {
+  commonArion = {
     service.volumes = [ "${builtins.getEnv "PWD"}/.:/srv" ];
     service.capabilities = { SYS_ADMIN = true; }; # for nfs
     service.useHostStore = true;
@@ -10,10 +10,14 @@ let
     nixos.runWrappersUnsafe = true;
   };
 
+  nodeExtraConfig = {
+    server = {};
+  };
+
   nodes = (import ./test.nix { inherit pkgs lib; }).nodes;
 
   # import of the function generating Arion expression
-  to_arion = import ./to_arion.nix;
+  toArion = import ./to_arion.nix;
 
-in 
-  to_arion {inherit lib common_arion nodes;}
+in
+  toArion {inherit lib commonArion nodes nodeExtraConfig;}

@@ -1,9 +1,12 @@
-{ lib, common_arion, nodes }:
+{ lib, commonArion, nodes, nodeExtraConfig ? { } }:
 
 {
-  config.services = builtins.mapAttrs (node_name: set:
+  config.services = builtins.mapAttrs (nodeName: set:
     lib.recursiveUpdate {
-      nixos.configuration = set;
-      service.hostname = node_name;
-    } common_arion) nodes;
+      nixos.configuration = if nodeExtraConfig ? nodeName then
+        (lib.recursiveUpdate set nodeExtraConfig.nodeName)
+      else
+        set;
+      service.hostname = nodeName;
+    } commonArion) nodes;
 }
