@@ -10,7 +10,8 @@ in
   pkgs.writeTextFile {
     name = "compose-info.json";
     text = builtins.toJSON({
-      inherit name driver;
+      inherit driver;
+      flavour = name;
     });
   };
 }
