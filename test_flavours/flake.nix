@@ -4,12 +4,14 @@
   outputs = { self, nixpkgs }:
   let
     helper = import ./helper.nix;
-    flavourFiles = helper.getFlavoursFile ./flavours;
+    rootPath = ./flavours;
+    flavourFiles = helper.getFlavoursFile rootPath;
     pkgs = import nixpkgs { system = "x86_64-linux"; };
+    
   in
   {
 
-    defaultPackage.x86_64-linux = self.packages.x86_64-linux.foo;
+    defaultPackage.x86_64-linux = self.packages.x86_64-linux.init;
 
     packages.x86_64-linux = builtins.listToAttrs (builtins.map (flavourFile: let
       flavourSet = import flavourFile;
@@ -18,7 +20,7 @@
       name  = flavourSet.name;
       value = flavourSet.compose { inherit pkgs ;};
     })
-    flavourFiles);
+    flavourFiles) // { init = helper.generateJSONFlavours { inherit rootPath pkgs; };} ;
 
   };
 }

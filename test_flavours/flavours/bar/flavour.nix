@@ -1,9 +1,10 @@
 let
   name = "bar";
   driver = ./driver.py;
+  description = "bar driver";
 in
 {
-  inherit name driver;
+  inherit name driver description;
   compose = { pkgs ? import <nixpkgs> {}, ... }:
 
   pkgs.writeTextFile {
