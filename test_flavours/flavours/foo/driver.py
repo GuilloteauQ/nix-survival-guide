@@ -1,5 +1,8 @@
-class Driver:
+from mother_driver import MotherDriver
+
+class Driver(MotherDriver):
     def __init__(self):
+        super().__init__(mother=False)
         self.name = "foo"
 
     def hello(self):
