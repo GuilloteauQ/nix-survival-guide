@@ -1,0 +1,161 @@
+#+TITLE: Execo as a scripting lib for NXC ?
+
+* The goal
+
+The goal here is to see if we can extend nixos-compose with a
+library for the scripting of experiments like Execo
+
+* Some info
+
+Execo has the notion of Engine: https://mimbert.gitlabpages.inria.fr/execo/execo_engine.html#id1
+
+An Engine provides:
+- central handling of options and arguments
+- automatic experiment directory creation
+- various ways to handle stdout / stderr
+- support for continuing a previously stopped experiment
+- log level selection
+  
+
+In pratice, users define their own engine as a subclass of the execo
+engine:
+
+#+BEGIN_EXAMPLE python
+class MyEngine(execo_engine.Engine):
+    def __init__(self):
+        super(MyEngine, self).__init__()
+        self.args_parser.add_argument('--myoption', default='foo',
+                                      help='An option to control how the experiment is done')
+    def run(self):
+        if self.args.myoption == "foo":
+            ...
+#+END_EXAMPLE
+
+
+In the case of nixos-compose, we would like to keep the nice naming of
+the testScript:
+
+#+BEGIN_EXAMPLE python
+server.run("hello")
+client.wait_for(...)
+#+END_EXAMPLE
+
+but extend this in order to have a full scriping of the experiment
+
+In the current state of the nixos-compose driver, we have the
+following code to generate the different machines:
+
+#+BEGIN_EXAMPLE python
+# https://gitlab.inria.fr/orichard/nixos-compose/-/blob/master/nixos_compose/driver.py#L1173
+
+    machine_eval = [
+        "{0} = machines[{1}]".format(m.name, idx) for idx, m in enumerate(machines)
+    ]
+    
+    ...
+
+    exec("\n".join(machine_eval), globals())
+
+#+END_EXAMPLE
+
+This has the goal to define variables with the name of the nodes and
+assign them to the stucture of machine define in the driver.
+
+We can take the following idea and try to expand the Engine of execo
+to be able to refere to the nodes by names
+
+Imagine with have a simple class for the Machines:
+
+#+BEGIN_EXAMPLE python
+class Machine:
+    def __init__(self, name):
+        self.name = name
+
+    def whoami(self):
+        print(self.name)
+#+END_EXAMPLE
+
+* First try: dictionnary
+
+#+BEGIN_EXAMPLE python
+class NXCEngine(execo_engine.Engine):
+    def __init__(self, nodes):
+        super(NXCEngine, self).__init__()
+	self.nodes = nodes
+	
+def main():
+    machines = {
+         "foo": Machine("foo"),
+         "bar": Machine("bar")
+    }
+    engine = NXCEngine(machines)
+    
+    engine.nodes["foo"].whoami()
+#+END_EXAMPLE
+
+This is one way we can have the naming of the nodes.
+
+For the test script, we can just `exec` the code in the composition
+before the run method of the engine.
+The issue is that we would need to rewrite the testScript in order to
+use dictionnary....
+
+* Second try: a small additional class
+
+Let us define the following class that will contain the nodes:
+
+#+BEGIN_EXAMPLE python
+class Nodes:
+   def __init__(self, nodes):
+       cmd_field = [f"self.{node_name} = nodes['{node_name}']" for machine_name in nodes]
+       exec("\n".join(cmd_field))
+       
+class NXCEngine(execo_engine.Engine):
+    def __init__(self, nodes):
+        super(NXCEngine, self).__init__()
+	
+def main():
+    machines = {
+         "foo": Machine("foo"),
+         "bar": Machine("bar")
+    }
+    engine = NXCEngine()
+    engine.nodes = Nodes(machines)
+    
+    engine.nodes.foo.whoami()
+
+#+END_EXAMPLE
+
+The testScript can then be executed by the Nodes structure.
+but we would need to rewrite the testScript to use `self` or `nodes`
+as a prefix of the nodes
+
+#+BEGIN_EXAMPLE python
+server.run("hello")
+client.wait_for(...)
+#+END_EXAMPLE
+
+would become
+
+#+BEGIN_EXAMPLE python
+self.server.run("hello")
+self.client.wait_for(...)
+#+END_EXAMPLE
+
+if called from the Nodes structure
+
+
+* Go global
+
+One solution would be to put every machine as global variables...
+
+
+* The proposition
+
+1. The driver builds the different machines
+2. The driver instantiate the Engine given by the user with the
+   machines
+3. The driver starts the engine
+4. We change slightly the engine such that we execute the testScript
+   before the main experiment
+
